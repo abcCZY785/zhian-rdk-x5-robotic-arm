@@ -1,0 +1,27 @@
+# ============================================================
+# 顶部全局相机内参配置
+# 型号: 奥比中光 Astra Pro (2bc5:0501)
+# 分辨率: 1280x720 (MJPG @30fps)
+# 内参来源: 多人标定数据汇总，从 640×480 等比缩放至 1280×720
+# 畸变系数: Brown-Conrady 模型，Astra Pro RGB 镜头典型值
+# ============================================================
+image_width: 1280
+image_height: 720
+camera_name: astra_pro_rgb
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [1054.0, 0.0, 646.0,
+         0.0, 793.5, 361.5,
+         0.0, 0.0, 1.0]
+  # 独立字段，与 calibration_node.py 兼容
+  fx: 1054.0
+  fy: 793.5
+  cx: 646.0
+  cy: 361.5
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.302, 0.071, -0.001, 0.003, 0.0]
+  dist_coeffs: [-0.302, 0.071, -0.001, 0.003, 0.0]

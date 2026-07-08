@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs and runtime outputs
+logs/
+snapshots/
+tmp/
+temp/
+tmp_*/
+*.log
+
+# Local configs and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.*
+
+# Models and large artifacts
+*.pt
+*.pth
+*.onnx
+*.bin
+*.engine
+*.hbm
+*.zip
+*.rar
+*.7z
+*.mp4
+*.avi
+*.mov
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# ROS2 / colcon
+install/
+log/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Bug-created Windows path directory
+C:/

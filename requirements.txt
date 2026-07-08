@@ -1,0 +1,13 @@
+# Core dependencies for Zhian RDK X5 Robotic Arm
+# Install: pip install -r requirements.txt
+
+# Vision & image processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Serial communication
+pyserial>=3.5
+
+# YOLO object detection
+# Note: optional if using BPU-only deployment
+ultralytics>=8.0.0
