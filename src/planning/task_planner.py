@@ -8,6 +8,7 @@ from typing import Any
 
 from .mimo_client import MimoClient
 from .task_schema import PlannedTask
+from src.safety.execution_authorization import unique_json_object
 
 
 SYSTEM_PROMPT = """You are a robotics task planner.
@@ -119,7 +120,7 @@ def extract_json_object(text: str) -> dict[str, Any]:
     end = text.rfind("}")
     if start < 0 or end < 0 or end <= start:
         raise ValueError(f"no json object found in response: {text[:400]}")
-    return json.loads(text[start : end + 1])
+    return json.loads(text[start : end + 1], object_pairs_hook=unique_json_object)
 
 
 def plan_text_instruction(client: MimoClient | None, instruction: str) -> PlannedTask:

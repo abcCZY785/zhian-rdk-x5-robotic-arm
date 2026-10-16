@@ -30,8 +30,18 @@ class PlannedTask:
     confirm_before_run: bool = True
     notes: str | None = None
 
+    def __post_init__(self) -> None:
+        # This is a mandatory policy, never evidence of operator consent.
+        if self.confirm_before_run is not True:
+            raise ValueError("confirm_before_run must be the boolean true")
+
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "PlannedTask":
+        if not isinstance(payload, dict):
+            raise ValueError("task must be a JSON object")
+        confirm_before_run = payload.get("confirm_before_run")
+        if confirm_before_run is not True:
+            raise ValueError("confirm_before_run is required and must be the boolean true")
         intent = str(payload.get("intent", "")).strip()
         object_label = str(payload.get("object_label", "")).strip()
         source = str(payload.get("source", "")).strip()
@@ -39,7 +49,6 @@ class PlannedTask:
         pour_target = payload.get("pour_target")
         pour_seconds = payload.get("pour_seconds")
         notes = payload.get("notes")
-        confirm_before_run = bool(payload.get("confirm_before_run", True))
 
         if intent not in SUPPORTED_INTENTS:
             raise ValueError(f"unsupported intent: {intent}")

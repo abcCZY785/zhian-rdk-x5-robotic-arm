@@ -15,15 +15,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from lab_assistant.location_resolver import choose_detection, resolve_place_target
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-ROOT = Path(__file__).resolve().parent
+from src.planning.location_resolver import choose_detection, resolve_place_target
+from src.planning.task_schema import PlannedTask
+from src.safety.execution_authorization import (
+    ExecutionConfirmationRequired,
+    require_execution_confirmation,
+    unique_json_object,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
 # TODO: Set YOLO_PYTHON to the Python interpreter with ultralytics installed.
 # Example: export YOLO_PYTHON=/path/to/yolo-venv/bin/python
 YOLO_PYTHON = Path(os.getenv("YOLO_PYTHON", "python"))
 PY313 = Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python313" / "python.exe"
-PLAN_SCRIPT = ROOT / "text_experiment_to_v8.py"
-VISION_LOCATOR = ROOT / "vision_table_yolo_locator.py"
+PLAN_SCRIPT = ROOT / "src" / "planning" / "text_experiment_to_v8.py"
+VISION_LOCATOR = ROOT / "src" / "perception" / "vision_table_yolo_locator.py"
 BUILD_TASK = ROOT / "build_pick_place_task_v7.py"
 LATEST_STATE = ROOT / "logs" / "assistant_web_latest.json"
 PUBLIC_VISION_DIR = ROOT / "urdf_learn" / "playground" / "playground" / "public" / "vision"
@@ -138,7 +147,10 @@ def run_subprocess(cmd: list[str], *, cwd: Path | None = None, label: str) -> No
         raise BridgeError(f"{label} failed: {proc.stderr.strip() or proc.stdout.strip() or proc.returncode}")
 
 
-def run_mimo_pipeline(*, instruction: str, mode: str, camera_index: int, port_name: str) -> dict:
+def run_mimo_pipeline(
+    *, instruction: str, mode: str, camera_index: int, port_name: str, confirm: bool = False
+) -> dict:
+    require_execution_confirmation(mode, confirm=confirm)
     api_key = os.environ.get("MIMO_API_KEY", "").strip()
     if not api_key:
         raise BridgeError("MIMO_API_KEY not set in bridge process environment")
@@ -169,7 +181,7 @@ def run_mimo_pipeline(*, instruction: str, mode: str, camera_index: int, port_na
     ]
     if mode == "plan":
         cmd.append("--build-only")
-    else:
+    elif mode == "execute":
         cmd.append("--confirm")
 
     run_subprocess(cmd, label="text_experiment_to_v8.py")
@@ -189,7 +201,10 @@ def run_mimo_pipeline(*, instruction: str, mode: str, camera_index: int, port_na
     return payload
 
 
-def run_template_pipeline(*, template_id: str, mode: str, camera_index: int, port_name: str) -> dict:
+def run_template_pipeline(
+    *, template_id: str, mode: str, camera_index: int, port_name: str, confirm: bool = False
+) -> dict:
+    require_execution_confirmation(mode, confirm=confirm)
     if template_id not in TEMPLATES:
         raise BridgeError(f"unknown template_id={template_id}")
     if not YOLO_PYTHON.exists():
@@ -198,6 +213,8 @@ def run_template_pipeline(*, template_id: str, mode: str, camera_index: int, por
         raise BridgeError(f"python313 not found: {PY313}")
 
     template = dict(TEMPLATES[template_id])
+    template.setdefault("confirm_before_run", True)
+    PlannedTask.from_dict(template)
     task_name = "text_experiment_v8_demo"
     vision_json = ROOT / "logs" / f"{task_name}_vision.json"
     vision_jpg = ROOT / "logs" / f"{task_name}_vision.jpg"
@@ -274,7 +291,7 @@ def run_template_pipeline(*, template_id: str, mode: str, camera_index: int, por
     if mode == "execute":
         run_cmd = [
             str(PY313),
-            str(ROOT / "run_pick_place_task_v7.py"),
+            str(ROOT / "src" / "control" / "run_pick_place_task_v7.py"),
             "--task-config",
             str(task_config),
             "--port",
@@ -337,23 +354,40 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, HTTPStatus.NOT_FOUND, {"ok": False, "error": "not found"})
             return
 
-        length = int(self.headers.get("Content-Length", "0") or "0")
-        raw = self.rfile.read(length) if length > 0 else b"{}"
         try:
-            body = json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError:
-            json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": "invalid json body"})
-            return
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length < 0:
+                raise ValueError("Content-Length must not be negative")
+            raw = self.rfile.read(length) if length > 0 else b"{}"
+            body = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_json_object)
+            if not isinstance(body, dict):
+                raise ValueError("request body must be a JSON object")
 
-        instruction = str(body.get("instruction", "")).strip()
-        template_id = str(body.get("template_id", "")).strip() or None
-        if not instruction and not template_id:
-            json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": "instruction or template_id is required"})
-            return
+            # Only the route selects the operation. Task/model fields cannot grant consent.
+            mode = "plan" if parsed.path == "/api/assistant/plan" else "execute"
+            confirm = body.get("confirm", False)
+            require_execution_confirmation(mode, confirm=confirm)
 
-        camera_index = int(body.get("camera_index", DEFAULT_CAMERA_INDEX))
-        port_name = str(body.get("port", DEFAULT_PORT_NAME))
-        mode = "plan" if parsed.path.endswith("/plan") else "execute"
+            instruction = body.get("instruction", "")
+            template_id = body.get("template_id", "")
+            if not isinstance(instruction, str) or not isinstance(template_id, str):
+                raise ValueError("instruction and template_id must be strings")
+            instruction = instruction.strip()
+            template_id = template_id.strip() or None
+            if not instruction and not template_id:
+                raise ValueError("instruction or template_id is required")
+            camera_index = body.get("camera_index", DEFAULT_CAMERA_INDEX)
+            if type(camera_index) is not int or camera_index < 0:
+                raise ValueError("camera_index must be a non-negative integer")
+            port_name = body.get("port", DEFAULT_PORT_NAME)
+            if not isinstance(port_name, str) or not port_name.strip():
+                raise ValueError("port must be a non-empty string")
+        except ExecutionConfirmationRequired as exc:
+            json_response(self, HTTPStatus.FORBIDDEN, {"ok": False, "error": str(exc)})
+            return
+        except (ValueError, UnicodeDecodeError) as exc:
+            json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})
+            return
 
         with STATE_LOCK:
             try:
@@ -371,6 +405,7 @@ class Handler(BaseHTTPRequestHandler):
                         mode=mode,
                         camera_index=camera_index,
                         port_name=port_name,
+                        confirm=confirm if mode == "execute" else False,
                     )
                 else:
                     payload = run_mimo_pipeline(
@@ -378,6 +413,7 @@ class Handler(BaseHTTPRequestHandler):
                         mode=mode,
                         camera_index=camera_index,
                         port_name=port_name,
+                        confirm=confirm if mode == "execute" else False,
                     )
                 save_latest_state(payload)
                 json_response(self, HTTPStatus.OK, payload)

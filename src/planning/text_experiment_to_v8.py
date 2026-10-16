@@ -7,25 +7,29 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
-from lab_assistant.location_resolver import (
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.planning.location_resolver import (
     LocationResolutionError,
     choose_detection,
     resolve_place_target,
 )
-from lab_assistant.mimo_client import MimoClient, MimoClientError
-from lab_assistant.task_planner import plan_text_instruction
-from lab_assistant.templates import execution_readiness, expand_plan
+from src.planning.mimo_client import MimoClient, MimoClientError
+from src.planning.task_planner import plan_text_instruction
+from src.planning.templates import execution_readiness, expand_plan
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 # TODO: Set YOLO_PYTHON to the Python interpreter with ultralytics installed.
 # Example: export YOLO_PYTHON=/path/to/yolo-venv/bin/python
 YOLO_PYTHON = Path(os.getenv("YOLO_PYTHON", "python"))
 PY313 = Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python313" / "python.exe"
-VISION_LOCATOR = ROOT / "vision_table_yolo_locator.py"
+VISION_LOCATOR = ROOT / "src" / "perception" / "vision_table_yolo_locator.py"
 BUILD_TASK = ROOT / "build_pick_place_task_v7.py"
-RUN_TASK = ROOT / "run_pick_place_task_v7.py"
+RUN_TASK = ROOT / "src" / "control" / "run_pick_place_task_v7.py"
 
 DEFAULT_BASE_URL = "https://api.xiaomimimo.com/v1"
 DEFAULT_MODEL = "mimo-v2.5-pro-ultraspeed"
