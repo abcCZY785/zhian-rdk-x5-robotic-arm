@@ -6,11 +6,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
-from lab_assistant.mimo_client import MimoClient, MimoClientError
-from lab_assistant.task_planner import plan_text_instruction
-from lab_assistant.templates import execution_readiness, expand_plan
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.planning.mimo_client import MimoClient, MimoClientError
+from src.planning.task_planner import plan_text_instruction
+from src.planning.templates import execution_readiness, expand_plan
 
 DEFAULT_BASE_URL = "https://api.xiaomimimo.com/v1"
 DEFAULT_MODEL = "mimo-v2.5-pro-ultraspeed"

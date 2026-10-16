@@ -18,4 +18,4 @@ vision:
 	@echo "TODO: run vision module"
 
 test:
-	@echo "TODO: run tests"
+	python -m unittest discover -s tests -v

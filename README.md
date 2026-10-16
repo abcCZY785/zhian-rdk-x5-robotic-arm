@@ -118,6 +118,14 @@ export MIMO_API_KEY=your_key_here
 python scripts/run_bridge.py --port 8766
 ```
 
+## 执行确认与离线测试
+
+执行确认规则、完全离线测试与剩余边界见 [执行授权说明](docs/execution_authorization_cn.md)。
+`POST /api/assistant/execute` 现在要求请求顶层 `confirm: true`；`/plan` 始终仅规划。
+任务中的 `confirm_before_run` 必须是布尔值 `true`，不能充当执行授权。
+
+从仓库根目录执行 `make test`，只运行使用模拟接口的离线授权测试。
+
 ## 硬件需求
 
 | 组件 | 型号 | 角色 |
@@ -149,7 +157,7 @@ zhian-rdk-x5-robotic-arm/
 ├── models/           # 模型权重（不入库，见 README）
 ├── docs/             # 文档
 ├── assets/           # 图片和演示素材
-├── tests/            # 测试（待补充）
+├── tests/            # 完全离线的执行授权测试
 ├── .env.example      # 环境变量模板
 ├── requirements.txt  # Python 依赖
 ├── Makefile          # 常用命令
@@ -178,7 +186,7 @@ zhian-rdk-x5-robotic-arm/
 配置文件已就位：camera_gripper.yaml、camera_top.yaml、default_areas.json。
 启动脚本已创建：run_vision.py、run_demo.py、run_bridge.py。
 
-待补充：simulation（MuJoCo 环境）、training（RL 训练脚本）、web 前端、tests。
+待补充：simulation（MuJoCo 环境）、training（RL 训练脚本）、web 前端。
 
 ## License
 
